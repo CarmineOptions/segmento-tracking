@@ -30,7 +30,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/create-owner", post(handlers::create_owner))
-        .route("/redemption/:code", get(handlers::create_redemption))
+        .route("/redemption/{code}", get(handlers::create_redemption))
         .route("/health", get(handlers::health_check))
         .with_state(app_state);
 

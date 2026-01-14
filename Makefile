@@ -15,7 +15,7 @@ dropdb:
 	docker exec -it $(DB_CONTAINER_NAME) dropdb $(DB_NAME)
 
 psql:
-	docker exec -it -u postgres carmine-db psql -d $(DB_NAME)
+	docker exec -it -u postgres $(DB_CONTAINER_NAME) psql -d $(DB_NAME)
 
 migrateup:
 	cd ${DB_CRATE_PATH} && diesel migration run

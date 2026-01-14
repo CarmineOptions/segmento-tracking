@@ -10,6 +10,11 @@ use serde_json::Value;
 
 use crate::AppState;
 
+#[derive(Deserialize)]
+pub struct RedemptionQuery {
+    pub meta: Option<String>,
+}
+
 pub async fn health_check() -> Response {
     (StatusCode::OK, "API is healthy").into_response()
 }
@@ -78,9 +83,4 @@ pub async fn create_redemption(
     });
 
     StatusCode::NO_CONTENT.into_response()
-}
-
-#[derive(Deserialize)]
-pub struct RedemptionQuery {
-    pub meta: Option<String>,
 }
