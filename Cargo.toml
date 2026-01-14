@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/api",
+  "crates/common",
+  "crates/database",
+  "crates/referral",
+  "crates/services",
+]
+
+[workspace.package]
+edition = "2024"
+
+[workspace.dependencies]
+diesel = { version = "2.3", features = [
+  "postgres",
+  "r2d2",
+  "serde_json",
+  "numeric",
+  "chrono",
+] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0" }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+tracing = "0.1.43"
+starknet = { git = "https://github.com/xJonathanLEI/starknet-rs" }
+dotenvy = "0.15"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
