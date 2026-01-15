@@ -49,6 +49,10 @@ async fn main() {
             get(handlers::create_redemption).options(handlers::options_ok),
         )
         .route(
+            "/redemption",
+            post(handlers::create_redemption_from_body).options(handlers::options_ok),
+        )
+        .route(
             "/export/project/{project}",
             get(handlers::export_project_csv).options(handlers::options_ok),
         )

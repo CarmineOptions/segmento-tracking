@@ -1,5 +1,6 @@
 use axum::{
     Json,
+    body::Bytes,
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
@@ -176,6 +177,38 @@ pub async fn create_redemption(
             Value::Object(map) if !map.is_empty() => Some(Value::Object(map)),
             _ => None,
         });
+
+    let state = state.clone();
+    tokio::spawn(async move {
+        let payload = ReferralRedemptionNew { code, meta };
+        if let Err(err) = state.referral_service.create_redemption(payload) {
+            tracing::warn!("failed to create redemption: {:?}", err);
+        }
+    });
+
+    StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn create_redemption_from_body(
+    State(state): State<std::sync::Arc<AppState>>,
+    body: Bytes,
+) -> Response {
+    let payload: ReferralRedemptionNew = match serde_json::from_slice(&body) {
+        Ok(payload) => payload,
+        Err(_) => {
+            return (StatusCode::BAD_REQUEST, "invalid redemption payload").into_response();
+        }
+    };
+
+    let code = payload.code.trim().to_string();
+    if code.is_empty() {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+
+    let meta = payload.meta.and_then(|value| match value {
+        Value::Object(map) if !map.is_empty() => Some(Value::Object(map)),
+        _ => None,
+    });
 
     let state = state.clone();
     tokio::spawn(async move {
