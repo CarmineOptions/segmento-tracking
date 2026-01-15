@@ -19,6 +19,10 @@ pub async fn health_check() -> Response {
     (StatusCode::OK, "API is healthy").into_response()
 }
 
+pub async fn options_ok() -> Response {
+    StatusCode::NO_CONTENT.into_response()
+}
+
 pub async fn create_owner(
     State(state): State<std::sync::Arc<AppState>>,
     Json(payload): Json<ReferralOwnerNew>,
