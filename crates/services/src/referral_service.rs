@@ -1,5 +1,5 @@
 use common::{ReferralOwnerNew, ReferralOwnerWithCode, ReferralRedemption, ReferralRedemptionNew};
-use database::referral_repo::ReferralRepo;
+use database::referral_repo::{ProjectExportRow, ReferralRepo};
 use referral::referral_code::map_to_referral_code;
 use serde_json::Value;
 
@@ -50,6 +50,15 @@ impl ReferralService {
     ) -> Result<ReferralRedemption, ReferralServiceError> {
         self.repo
             .create_redemption(redemption)
+            .map_err(|_| ReferralServiceError::DatabaseError)
+    }
+
+    pub fn get_project_export_rows(
+        &self,
+        project: &str,
+    ) -> Result<Vec<ProjectExportRow>, ReferralServiceError> {
+        self.repo
+            .get_project_export_rows(project)
             .map_err(|_| ReferralServiceError::DatabaseError)
     }
 }

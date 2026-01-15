@@ -3,8 +3,11 @@ use common::{
     ReferralRedemption, ReferralRedemptionNew,
 };
 use diesel::prelude::*;
+use diesel::sql_types::{Bool, Int4, Int8, Jsonb, Nullable, Text, Timestamptz};
+use diesel::{QueryableByName, sql_query};
 use diesel::r2d2::{ConnectionManager, Error as PoolError, PooledConnection};
 use diesel::{OptionalExtension, SelectableHelper};
+use chrono::NaiveDateTime;
 use serde_json::Value;
 
 use crate::PgPool;
@@ -16,6 +19,34 @@ use crate::schema::{referral_codes, referral_owners, referral_redemptions};
 
 pub struct ReferralRepo {
     pool: PgPool,
+}
+
+#[derive(Debug, QueryableByName)]
+pub struct ProjectExportRow {
+    #[diesel(sql_type = Int8)]
+    pub owner_id: i64,
+    #[diesel(sql_type = Jsonb)]
+    pub owner_meta: Value,
+    #[diesel(sql_type = Timestamptz)]
+    pub owner_created_at: NaiveDateTime,
+    #[diesel(sql_type = Timestamptz)]
+    pub owner_updated_at: NaiveDateTime,
+    #[diesel(sql_type = Text)]
+    pub code: String,
+    #[diesel(sql_type = Bool)]
+    pub code_is_active: bool,
+    #[diesel(sql_type = Int4)]
+    pub code_use_count: i32,
+    #[diesel(sql_type = Timestamptz)]
+    pub code_created_at: NaiveDateTime,
+    #[diesel(sql_type = Timestamptz)]
+    pub code_updated_at: NaiveDateTime,
+    #[diesel(sql_type = Nullable<Int8>)]
+    pub redemption_id: Option<i64>,
+    #[diesel(sql_type = Nullable<Jsonb>)]
+    pub redemption_meta: Option<Value>,
+    #[diesel(sql_type = Nullable<Timestamptz>)]
+    pub redemption_created_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug)]
@@ -165,5 +196,37 @@ impl ReferralRepo {
         };
         let code = self.get_code(owner.id)?;
         Ok(Some(ReferralOwnerWithCode { owner, code }))
+    }
+
+    pub fn get_project_export_rows(
+        &self,
+        project: &str,
+    ) -> Result<Vec<ProjectExportRow>, ReferralRepoError> {
+        let mut conn = self.conn()?;
+        let rows = sql_query(
+            r#"
+            SELECT
+                o.id AS owner_id,
+                o.meta AS owner_meta,
+                o.created_at AS owner_created_at,
+                o.updated_at AS owner_updated_at,
+                c.code AS code,
+                c.is_active AS code_is_active,
+                c.use_count AS code_use_count,
+                c.created_at AS code_created_at,
+                c.updated_at AS code_updated_at,
+                r.id AS redemption_id,
+                r.meta AS redemption_meta,
+                r.created_at AS redemption_created_at
+            FROM referral_owners o
+            JOIN referral_codes c ON c.owner_id = o.id
+            LEFT JOIN referral_redemptions r ON r.code = c.code
+            WHERE o.meta->>'project' = $1
+            ORDER BY o.id, c.code, r.created_at
+            "#,
+        )
+        .bind::<Text, _>(project)
+        .load::<ProjectExportRow>(&mut conn)?;
+        Ok(rows)
     }
 }

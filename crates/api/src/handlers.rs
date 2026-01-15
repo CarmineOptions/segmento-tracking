@@ -1,9 +1,10 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
+use csv::Writer;
 use common::{ReferralOwnerNew, ReferralRedemptionNew};
 use serde::Deserialize;
 use serde_json::Value;
@@ -21,6 +22,87 @@ pub async fn health_check() -> Response {
 
 pub async fn options_ok() -> Response {
     StatusCode::NO_CONTENT.into_response()
+}
+
+pub async fn export_project_csv(
+    State(state): State<std::sync::Arc<AppState>>,
+    Path(project): Path<String>,
+) -> Response {
+    let rows = match state.referral_service.get_project_export_rows(&project) {
+        Ok(rows) => rows,
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "export failed").into_response();
+        }
+    };
+
+    let mut writer = Writer::from_writer(Vec::new());
+    if writer
+        .write_record([
+            "owner_id",
+            "owner_meta",
+            "owner_created_at",
+            "owner_updated_at",
+            "code",
+            "code_is_active",
+            "code_use_count",
+            "code_created_at",
+            "code_updated_at",
+            "redemption_id",
+            "redemption_meta",
+            "redemption_created_at",
+        ])
+        .is_err()
+    {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "export failed").into_response();
+    }
+
+    for row in rows {
+        let owner_meta = serde_json::to_string(&row.owner_meta).unwrap_or_default();
+        let redemption_meta = row
+            .redemption_meta
+            .as_ref()
+            .and_then(|meta| serde_json::to_string(meta).ok())
+            .unwrap_or_default();
+        let redemption_id = row
+            .redemption_id
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+        let redemption_created_at = row
+            .redemption_created_at
+            .map(|value| value.to_string())
+            .unwrap_or_default();
+
+        if writer
+            .write_record([
+                row.owner_id.to_string(),
+                owner_meta,
+                row.owner_created_at.to_string(),
+                row.owner_updated_at.to_string(),
+                row.code,
+                row.code_is_active.to_string(),
+                row.code_use_count.to_string(),
+                row.code_created_at.to_string(),
+                row.code_updated_at.to_string(),
+                redemption_id,
+                redemption_meta,
+                redemption_created_at,
+            ])
+            .is_err()
+        {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "export failed").into_response();
+        }
+    }
+
+    let csv_data = match writer.into_inner() {
+        Ok(data) => data,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "export failed").into_response(),
+    };
+
+    (
+        [(header::CONTENT_TYPE, "text/csv; charset=utf-8")],
+        csv_data,
+    )
+        .into_response()
 }
 
 pub async fn create_owner(

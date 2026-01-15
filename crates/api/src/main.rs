@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     http::{HeaderValue, Method},
-    routing::{get, options, post},
+    routing::{get, post},
 };
 use database::{create_pool, referral_repo::ReferralRepo};
 use services::referral_service::ReferralService;
@@ -47,6 +47,10 @@ async fn main() {
         .route(
             "/redemption/{code}",
             get(handlers::create_redemption).options(handlers::options_ok),
+        )
+        .route(
+            "/export/project/{project}",
+            get(handlers::export_project_csv).options(handlers::options_ok),
         )
         .route("/health", get(handlers::health_check))
         .with_state(app_state)
