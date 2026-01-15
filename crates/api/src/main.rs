@@ -52,6 +52,10 @@ async fn main() {
             "/export/project/{project}",
             get(handlers::export_project_csv).options(handlers::options_ok),
         )
+        .route(
+            "/export",
+            get(handlers::export_bitdca_csv).options(handlers::options_ok),
+        )
         .route("/health", get(handlers::health_check))
         .with_state(app_state)
         .layer(cors);

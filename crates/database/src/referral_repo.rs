@@ -221,7 +221,7 @@ impl ReferralRepo {
             FROM referral_owners o
             JOIN referral_codes c ON c.owner_id = o.id
             LEFT JOIN referral_redemptions r ON r.code = c.code
-            WHERE o.meta->>'project' = $1
+            WHERE lower(o.meta->>'project') = lower($1)
             ORDER BY o.id, c.code, r.created_at
             "#,
         )

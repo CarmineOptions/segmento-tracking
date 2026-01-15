@@ -35,6 +35,23 @@ pub async fn export_project_csv(
         }
     };
 
+    export_csv_response(rows)
+}
+
+pub async fn export_bitdca_csv(
+    State(state): State<std::sync::Arc<AppState>>,
+) -> Response {
+    let rows = match state.referral_service.get_project_export_rows("bitDCA") {
+        Ok(rows) => rows,
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "export failed").into_response();
+        }
+    };
+
+    export_csv_response(rows)
+}
+
+fn export_csv_response(rows: Vec<database::referral_repo::ProjectExportRow>) -> Response {
     let mut writer = Writer::from_writer(Vec::new());
     if writer
         .write_record([
