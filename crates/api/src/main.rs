@@ -44,13 +44,10 @@ async fn main() {
             "/create-owner",
             post(handlers::create_owner).options(handlers::options_ok),
         )
+        // obfuscated path so that browsers don't block analytics
         .route(
-            "/redemption/{code}",
+            "/assets/{code}/{meta}/{ts}/favicon.ico",
             get(handlers::create_redemption).options(handlers::options_ok),
-        )
-        .route(
-            "/redemption",
-            post(handlers::create_redemption_from_body).options(handlers::options_ok),
         )
         .route(
             "/export/project/{project}",

@@ -1,20 +1,29 @@
 use axum::{
     Json,
-    body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use csv::Writer;
 use common::{ReferralOwnerNew, ReferralRedemptionNew};
+use csv::Writer;
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::AppState;
 
 #[derive(Deserialize)]
-pub struct RedemptionQuery {
-    pub meta: Option<String>,
+pub struct RedemptionPath {
+    pub code: String,
+    pub meta: String,
+    pub ts: String,
+}
+
+fn favicon_no_content() -> Response {
+    (
+        [(header::CONTENT_TYPE, "image/x-icon")],
+        StatusCode::NO_CONTENT,
+    )
+        .into_response()
 }
 
 pub async fn health_check() -> Response {
@@ -39,9 +48,7 @@ pub async fn export_project_csv(
     export_csv_response(rows)
 }
 
-pub async fn export_bitdca_csv(
-    State(state): State<std::sync::Arc<AppState>>,
-) -> Response {
+pub async fn export_bitdca_csv(State(state): State<std::sync::Arc<AppState>>) -> Response {
     let rows = match state.referral_service.get_project_export_rows("bitDCA") {
         Ok(rows) => rows,
         Err(_) => {
@@ -161,62 +168,34 @@ pub async fn create_owner(
 
 pub async fn create_redemption(
     State(state): State<std::sync::Arc<AppState>>,
-    Path(code): Path<String>,
-    Query(query): Query<RedemptionQuery>,
+    Path(path): Path<RedemptionPath>,
 ) -> Response {
+    let RedemptionPath { code, meta, ts } = path;
     let code = code.trim().to_string();
     if code.is_empty() {
-        return StatusCode::NO_CONTENT.into_response();
+        return favicon_no_content();
     }
-
-    let meta = query
-        .meta
-        .as_deref()
-        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+    let parsed_meta = serde_json::from_str::<Value>(&meta)
+        .ok()
         .and_then(|value| match value {
+            Value::Null => None,
             Value::Object(map) if !map.is_empty() => Some(Value::Object(map)),
-            _ => None,
+            Value::Object(_) => None,
+            other => Some(other),
         });
 
+    tracing::info!("received redemption {}, {}, {:?}", ts, code, meta);
+
     let state = state.clone();
     tokio::spawn(async move {
-        let payload = ReferralRedemptionNew { code, meta };
+        let payload = ReferralRedemptionNew {
+            code,
+            meta: parsed_meta,
+        };
         if let Err(err) = state.referral_service.create_redemption(payload) {
             tracing::warn!("failed to create redemption: {:?}", err);
         }
     });
 
-    StatusCode::NO_CONTENT.into_response()
-}
-
-pub async fn create_redemption_from_body(
-    State(state): State<std::sync::Arc<AppState>>,
-    body: Bytes,
-) -> Response {
-    let payload: ReferralRedemptionNew = match serde_json::from_slice(&body) {
-        Ok(payload) => payload,
-        Err(_) => {
-            return (StatusCode::BAD_REQUEST, "invalid redemption payload").into_response();
-        }
-    };
-
-    let code = payload.code.trim().to_string();
-    if code.is_empty() {
-        return StatusCode::NO_CONTENT.into_response();
-    }
-
-    let meta = payload.meta.and_then(|value| match value {
-        Value::Object(map) if !map.is_empty() => Some(Value::Object(map)),
-        _ => None,
-    });
-
-    let state = state.clone();
-    tokio::spawn(async move {
-        let payload = ReferralRedemptionNew { code, meta };
-        if let Err(err) = state.referral_service.create_redemption(payload) {
-            tracing::warn!("failed to create redemption: {:?}", err);
-        }
-    });
-
-    StatusCode::NO_CONTENT.into_response()
+    favicon_no_content()
 }
